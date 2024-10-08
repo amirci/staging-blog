@@ -441,15 +441,25 @@ Being a pure function, there is no need to deal with exceptions; we just need to
 Python provides a [Literal](https://typing.readthedocs.io/en/latest/spec/literal.html#literal-types) type to represent specific values.
 
 ```python
+from urllib.parse import urlparse, parse_qs
+
 Token = str
 
 ExtractTokenError = Literal['TokenMissing', 'TokenInvalid'] # same as a union
+
 
 def extract_token_from_url(url) -> Either[ExtractTokenError, Token]:
   """
   Returns a `Right[Token]` if the token is present and valid or `Left[ExtractTokenError]` if not
   """
-  pass
+  parsed_url = urlparse(url)
+  query_params = parse_qs(parsed_url.query)
+
+  match query_params.get('token'):
+    case None: return Left('TokenMissing')
+    case token if not isinstance(token, str) or len(token) < 10: return Left('TokenInvalid')
+    case token: return Either.insert(token)
+
 
 ```
 
@@ -575,14 +585,10 @@ MissingSubscription = Literal['MissingSubscription']
 SubscriptionError = ExpiredSubscription | MissingSubscription
 
 
-@either_try(to_api_call_error('Fetch subscription for customer'))
-def fetch_subscription(customer_info: CustomerInformation) -> Either[ApiCallError | SubscriptionError, Subscription]:
-
-  response = external_client.fetch_subscriptions(customer_info.customer_id, customer_info.customer_account_id)
-
-  subscriptions = validate_subscriptions_schema(response.data)
-
-  # Find first the subscription with the right product code
+def find_active_subscription(customer_info, subscriptions) -> Either[SubscriptionError, Subscription]:
+  """
+  Finds the first the subscription with the right product code
+  """
   gen = [s for s in subscription if s.product_code == customer_info.product_code]
 
   match next(gen, None):
@@ -591,6 +597,16 @@ def fetch_subscription(customer_info: CustomerInformation) -> Either[ApiCallErro
     case found if found.expiration_date < dt.datetime.now(pytz.utc): return Left(ExpiredSubscription(found.expiration_date))
 
     case found: return Either.insert(found)
+
+
+@either_try(to_api_call_error('Fetch subscription for customer'))
+def fetch_subscription(customer_info: CustomerInformation) -> Either[ApiCallError | SubscriptionError, Subscription]:
+
+  response = external_client.fetch_subscriptions(customer_info.customer_id, customer_info.customer_account_id)
+
+  subscriptions = validate_subscriptions_schema(response.data)
+
+  return find_active_subscription(customer_info, subscriptions)
 
 ```
 
