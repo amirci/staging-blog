@@ -387,6 +387,9 @@ def request_handler(request: Request):
   return redirect_with(active_subscription)
 ```
 
+This is quite a bit of code. Please check out this [gist](https://gist.github.com/amirci/980e7bb0c517acd0287246f62a493c8a) to see all the parts together.
+
+
 ## Modeling errors using the `Either` type
 
 Let us explore in [contrast]({% link _posts/2024-08-11-modelling-errors.markdown %}#modeling-failures-with-types) how using the `Either` type from [pymonad](https://github.com/jasondelaat/pymonad) can help us model errors in a more succinct and declarative way.
@@ -464,6 +467,12 @@ def extract_token_from_url(url) -> Either[ExtractTokenError, Token]:
 ```
 
 #### Working with impure functions
+
+{: .box-note }
+This sections describes a solution to a common pattern when dealing with exceptions and the `Either` type.
+The solution involves using [decorators](https://peps.python.org/pep-0318/) to simplify the code for impure functions.
+Feel free to skip it and come back later if you need to
+
 
 Often when working with side effects, a pattern appears where exceptions must to be translated into types. For our example, that means that code that can throw an `Exception` needs to be converted into an `Either[L, R]`.
 
